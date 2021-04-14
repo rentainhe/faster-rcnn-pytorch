@@ -1,8 +1,11 @@
 ## data
 data preprocess
 
-## structure
-- [__utils.py__]()
+## data structure
+- [__PASCAL VOC数据集标注格式__](https://zhuanlan.zhihu.com/p/33405410)
+
+## dict structure
+- [__utils.py__](https://github.com/rentainhe/faster-rcnn-pytorch/blob/master/data/util.py)
 
 ## contents
 ### 1. utils
