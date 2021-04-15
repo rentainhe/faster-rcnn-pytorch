@@ -61,6 +61,7 @@ def preprocess(img, min_size=600, max_size=1000):
     scale1 = min_size / min(H, W)
     scale2 = max_size / max(H, W)
     scale = min(scale1, scale2)
+    # 要求最长边不能超过1000, 最短边不能超过600, 所以这里会取 H_scale 和 W_scale 中更小的一个
     img = img / 255.
     img = sktsf.resize(img, (C, H * scale, W * scale), mode='reflect', anti_aliasing=False)
     # both the longer and shorter should be less than max_size and min_size
