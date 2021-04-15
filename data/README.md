@@ -6,6 +6,8 @@ data preprocess
 
 ## dict structure
 - [__utils.py__](https://github.com/rentainhe/faster-rcnn-pytorch/blob/master/data/util.py)
+- [__voc_dataset.py__](https://github.com/rentainhe/faster-rcnn-pytorch/blob/master/data/voc_dataset.py)
+- [__dataset.py__](https://github.com/rentainhe/faster-rcnn-pytorch/blob/master/data/dataset.py)
 
 ## contents
 ### 1. utils
@@ -26,3 +28,15 @@ The second axis represents attributes of the bounding box. They are `(y_{min}, x
 - __translate_bbox (bbox, y_offset=0, x_offset=0): Translate bounding boxes__
 
 - __random_flip (img, y_random=False, x_random=False, return_param=False, copy=False): Randomly flip an image in vertical or horizontal direction__
+
+### 2. voc_dataset
+__define the `VOC Bounding box` dataset, which returns: img list, bbox list, label list__
+- __img: img array, format: numpy.float32__
+- __bbox: bounding box, format: numpy.float32__
+- __label: the label related to the bbox, format: numpy.int32__
+- __difficult(options): the difficult object, format: numpy.bool__
+
+### 3. dataset
+__define the final dataset which concludes:__
+- __img preprocess__
+- __bbox preprocess__
