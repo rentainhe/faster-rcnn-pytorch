@@ -206,7 +206,18 @@ class AnchorTargetCreator(object):
         n_anchor = len(anchor)
         inside_index = _get_inside_index(anchor, img_H, img_W)  # 计算完全落在图片内部的anchor
         anchor = anchor[inside_index]
-        argmax_ious, label =
+        argmax_ious, label = self._create_label(
+            inside_index, anchor, bbox
+        )
+
+        # compute bounding box regression targets
+        loc = bbox2loc(anchor, bbox[argmax_ious])
+
+        # map up to original set of anchors
+        label = _unmap(label, n_anchor, inside_index, fill=-1)
+        loc = _unmap(loc, n_anchor, inside_index, fill=0)
+
+        return loc, label
 
     def _create_label(self, inside_index, anchor, bbox):
         # label: 1 is positive, 0 is negative, -1 is dont care
@@ -243,6 +254,8 @@ class AnchorTargetCreator(object):
             )
             label[disable_index] = -1
 
+        return argmax_ious, label
+
     def _calc_ious(self, anchor, bbox, inside_index):
         # ious between the anchors and the gt boxes
         # 假设传入的 anchor 大小为 (N, 4), 传入的bbox大小为 (M, 4)
@@ -260,7 +273,29 @@ class AnchorTargetCreator(object):
         gt_max_ious = ious[gt_argmax_ious, np.arange(ious.shape[1])]
         gt_argmax_ious = np.where(ious == gt_max_ious)[0]
 
+        # argmax_ious: 每个 anchor 对应的最大 iou 的 bbox 的 index
+        # max_ious: 每个在图片内的 anchor, 所对应的最大 iou
+        # gt_argmax_ious: 每个 ground truth box 对应最大 iou 的 anchor 的 index
         return argmax_ious, max_ious, gt_argmax_ious
+
+
+def _unmap(data, count, index, fill=0):
+    # Unmap a subset of item (data) back to the original set of items (of size count)
+    # 将 data 按照对应的 index, 贴到原来大小的数组中去
+    # data: 我们需要的数据
+    # count: 原始数组大小, 可以大于 data
+    # index: index 对应每个 data 应该在原始数组中存放的位置
+    # fill: 其余没有存放data的位置用 fill 填充
+
+    if len(data.shape) == 1:
+        ret = np.empty((count,), dtype=data.dtype)
+        ret.fill(fill)
+        ret[index] = data
+    else:
+        ret = np.empty((count,) + data.shape[1:], dtype=data.dtype)
+        ret.fill(fill)
+        ret[index, :] = data
+    return ret
 
 
 def _get_inside_index(anchor, H, W):
