@@ -3,7 +3,7 @@ build faster-rcnn model
 
 ## dict structure
 - [__utils.bbox_tools__](https://github.com/rentainhe/faster-rcnn-pytorch/blob/master/model/utils/bbox_tools.py)
-- [__utils.creator_tools__]()
+- [__utils.creator_tools__](https://github.com/rentainhe/faster-rcnn-pytorch/blob/master/model/utils/creator_tool.py)
 
 ## contents
 ### 1. utils.bbox_tools
@@ -23,3 +23,15 @@ build faster-rcnn model
   
 - __generate_anchor_base (base_size=16, ratios=[0.5, 1, 2], anchor_scales=[8, 16, 32]): Generate anchor base windows by enumerating aspect ratio and scales__
   - __根据对应的比率和anchor size来生成候选框__
+ 
+ 
+### 2. utils.creator_tools
+#### ProposalTargetCreator
+Assign ground truth bounding boxes to given RoIs, 给 region of interest 分配标签
+
+初始化:
+- __n_sample: 采样数量__
+- __pos_ratio: 所采的positive roi占比__
+- __pos_iou_thresh: IoU threshold for a RoI to be considered as a foreground__
+- __neg_iou_thresh_hi, neg_iou_thresh_lo: RoI is considered to be the background if IoU is in [hi, lo]__
+
