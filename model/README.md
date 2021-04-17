@@ -27,11 +27,56 @@ build faster-rcnn model
  
 ### 2. utils.creator_tools
 #### ProposalTargetCreator
-Assign ground truth bounding boxes to given RoIs, 给 region of interest 分配标签
+Assign ground truth bounding boxes to given RoIs, 为传入进来的 RoI 分配一个 ground truth 类别
 
-初始化:
-- __n_sample: 采样数量__
-- __pos_ratio: 所采的positive roi占比__
-- __pos_iou_thresh: IoU threshold for a RoI to be considered as a foreground__
-- __neg_iou_thresh_hi, neg_iou_thresh_lo: RoI is considered to be the background if IoU is in [hi, lo]__
+所需的参数和返回值如下所示:
 
+__init:__
+- __n_sample=128: 采样数量__
+- __pos_ratio=0.25: 所采的positive roi占比__
+- __pos_iou_thresh=0.5: IoU threshold for a RoI to be considered as a foreground__
+- __neg_iou_thresh_hi=0.5, neg_iou_thresh_lo=0.0: RoI is considered to be the background if IoU is in [hi, lo]__
+
+__call:__
+- __roi (R, 4): Region of Interests (RoIs) from which we sample.__
+- __bbox (R, 4): The coordinates of ground truth bounding boxes.__
+- __label (R, ): Ground truth bounding box labels.__
+- __loc_normalize_mean: 对 Offset 和 Scales 的均值归一化__
+- __loc_normalize_std__
+
+__returns:__
+- __sample_roi (S, 4): 采样的 Region of Interests__
+- __gt_roi_loc (S, 4): 所采样的 Region of Interests 相对于其分配的 Ground truth 的 Offsets 和 Scales__
+- __gt_roi_label (S, ): 所采样的 Region of Interests 所对应的 Label, 如果被分配到 0 的话则为 background__
+
+具体流程如下:
+
+- 将传入的 roi 和 bbox 拼接到一起, 这一步是为了在训练的时候能考虑到所有的 ground truth, 至少在训练中得包含 ground truth
+- 对拼接后的 roi 和 bbox 两两之间计算 ious, 使用 `bbox_iou` 函数
+- 为每一个 roi 分配一个具体的 ground truth 类别, 然后根据 pos_iou_thresh 来选取对应数量的 positive roi 作为正样本
+- 根据 neg_iou_thresh_hi 和 neg_iou_thresh_lo 选取对应的负样本
+- 计算所采样的 roi, 相对于 ground truth 的 bounding box 的中心点偏移值以及长宽比率(loc), 使用 `bbox2loc` 函数
+- 对偏移值进行归一化
+- 返回: `所采样的 roi`, `采样的roi相对于bbox的loc`, `采样的roi的label`
+
+#### AnchorTargetCreator
+Assign the ground truth bounding boxes to anchors.
+
+Assign the ground truth bounding boxes to anchors for training `Region Proposal Networks`.
+
+采样训练 RPN 网络
+
+__init:__
+- __n_sample=256: 总共采样的数量__
+- __pos_iou_thresh=0.7: 选取作为前景(positive)样本的 threshold__
+- __neg_iou_thresh=0.3: 选取作为背景(negative)样本的 threshold__
+- __pos_ratio=0.5: 前景样本的比例__
+
+__call:__
+- __bbox (R, 4): Coordinates of ground truth bounding boxes__
+- __anchor (S, 4): Coordinates of anchors__
+- __img_size (H, W): Image size__
+
+__returns:__
+- __loc (S, 4): Offsets and scales to match the anchors to the ground truth bounding boxes, 每个anchor与其对应的bounding box的中心点偏移值以及长宽比例__
+- __label (S, ): 每个anchor对应的标签, 其中 1 = positive, 0 = negative, -1 = ignore__
