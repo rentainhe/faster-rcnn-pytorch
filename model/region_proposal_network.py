@@ -100,24 +100,52 @@ class RegionProposalNetwork(nn.Module):
 
         """
         n, _, hh, ww = x.shape
-        anchor = _enumerate_shifted_anchor(
+        anchor = _enumerate_shifted_anchor(  # 得到一张图上的所有 anchor
             np.array(self.anchor_base),
             self.feat_stride, hh, ww
         )
-
         n_anchor = anchor.shape[0] // (hh * ww)  # 每个 grid 对应的 anchor 数量
+
+        # conv1: nn.Conv2d(in_channels, mid_channels, 3, 1, 1), 对原始输入再进行一次卷积操作
         h = F.relu(self.conv1(x))
 
+        # loc: nn.Conv2d(mid_channels, n_anchor * 4, 1, 1, 0), 在卷积后的特征图上, 经过一个 1 * 1 的卷积核, 来获得预测的 loc 值
         rpn_locs = self.loc(h)
+
         # UNNOTE: check whether need contiguous
         # A: Yes
-        rpn_locs = rpn_locs.permute(0, 2, 3, 1).contiguous().view(n, -1, 4)
+
+        # input: (B, n_anchor*4, hh, ww)  ->  output: (B, hh, ww, anchor*4)  ->  (B, hh * ww * anchor, 4)
+        rpn_locs = rpn_locs.permute(0, 2, 3, 1).contiguous().view(n, -1, 4)  # 预测每个anchor的中心点偏移值以及长宽比率
+
+        # score: nn.Conv2d(mid_channels, n_anchor * 2, 1, 1, 0)
         rpn_scores = self.score(h)
         rpn_scores = rpn_scores.permute(0, 2, 3, 1).contiguous()
-        rpn_softmax_scores = F.softmax(rpn_scores.view(n, hh, ww, n_anchor, 2), dim=4)
-        rpn_fg_scores = rpn_softmax_scores[:, :, :, :, 1].contiguous()
+        rpn_softmax_scores = F.softmax(rpn_scores.view(n, hh, ww, n_anchor, 2), dim=4)  # 预测前景背景分数
+        rpn_fg_scores = rpn_softmax_scores[:, :, :, :, 1].contiguous()  # 预测为前景的分数
         rpn_fg_scores = rpn_fg_scores.view(n, -1)
         rpn_scores = rpn_scores.view(n, -1, 2)
+
+        rois = list()
+        roi_indices = list()
+        # self.proposal_layer 是 ProposalCreator, 传入的参数是 loc, scores, anchor, img_size, scale=1.
+        # loc 是每个图上的每个 grid 预测出来的每个 grid 对应 9 个 anchors的中心点偏移和宽高比率
+        # scores 是预测出来的其为前景的概率
+        # anchor 就是每张图对应的 anchor 点
+        for i in range(n):
+            roi = self.proposal_layer(
+                rpn_locs[i].cpu().data.numpy(),
+                rpn_fg_scores[i].cpu().data.numpy(),
+                anchor, img_size,
+                scale=scale
+            )
+            batch_index = i * np.ones((len(roi),), dtype=np.int32)
+            rois.append(roi)
+            roi_indices.append(batch_index)
+
+        rois = np.concatenate(rois, axis=0)
+        roi_indices = np.concatenate(roi_indices, axis=0)
+        return rpn_locs, rpn_scores, rois, roi_indices, anchor
 
 
 def _enumerate_shifted_anchor(anchor_base, feat_stride, height, width):
@@ -149,6 +177,33 @@ def _enumerate_shifted_anchor(anchor_base, feat_stride, height, width):
              shift.reshape((1, K, 4)).transpose((1, 0, 2))
     anchor = anchor.reshape((K * A, 4)).astype(np.float32)
     # 最终得到每个 grid 映射回原图的 anchor 坐标
+    return anchor
+
+
+def _enumerate_shifted_anchor_torch(anchor_base, feat_stride, height, width):
+    # Enumerate all shifted anchors:
+    #
+    # add A anchors (1, A, 4) to
+    # cell K shifts (K, 1, 4) to get
+    # shift anchors (K, A, 4)
+    # reshape to (K*A, 4) shifted anchors
+    # return (K*A, 4)
+
+    # !TODO: add support for torch.CudaTensor
+    # xp = cuda.get_array_module(anchor_base)
+    import torch as t
+    import numpy as xp
+    shift_y = t.arange(0, height * feat_stride, feat_stride)
+    shift_x = t.arange(0, width * feat_stride, feat_stride)
+    shift_x, shift_y = xp.meshgrid(shift_x, shift_y)
+    shift = xp.stack((shift_y.ravel(), shift_x.ravel(),
+                      shift_y.ravel(), shift_x.ravel()), axis=1)
+
+    A = anchor_base.shape[0]
+    K = shift.shape[0]
+    anchor = anchor_base.reshape((1, A, 4)) + \
+             shift.reshape((1, K, 4)).transpose((1, 0, 2))
+    anchor = anchor.reshape((K * A, 4)).astype(np.float32)
     return anchor
 
 
