@@ -116,3 +116,17 @@ __call:__
 - __anchor: Coordinates of anchors. Its shape is (R, 4)__
 - __img_size: A tuple which contains image size after scaling__
 - __scale: The scaling factor used to scale an image after reading it from a file__ 
+
+__returns:__
+- __roi: An array of coordinates of proposal boxes. Its shape is  (S, 4).
+
+具体流程如下:
+- 首先根据传进来的`parent_model.training`来判断模型是处于训练阶段还是测试阶段
+- 然后再将传进来预测的 `loc` 转化为对应的 predicted bbox , 因为 `loc` 是我们 `RPN` 预测出来的
+- 然后对预测的 bbox 进行 clip 操作, 将 predicted bbox 限制在图像范围内, 具体做法就是超过图像的部分裁剪到图像大小, 使用 `numpy.clip` 函数
+- 根据我设置的 `min_size` 参数, 裁减掉过于小的 predicted bbox
+- 根据传入进来的 predicted foreground probability 进行排序操作, 选取 `n_pre_nms` 个候选框进行 nms 操作, `n_pre_nms` 是由 `n_train_pre_nms` 等决定的
+- 将这些保留下来的框送入 nms 进行处理, 保留最终的结果, 数量为 `n_post_nms` 个
+
+
+
