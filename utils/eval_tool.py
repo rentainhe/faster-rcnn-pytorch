@@ -147,4 +147,13 @@ def calc_detection_voc_prec_rec(
     score = defaultdict(list)
     match = defaultdict(list)
 
+    for pred_bbox, pred_label, pred_score, gt_bbox, gt_label, gt_difficult in \
+            six.moves.zip(pred_bboxes, pred_labels, pred_scores, gt_bboxes, gt_labels, gt_difficults):
+        # six是用来兼容 python2 和 python3 的一个库
 
+        # default gt_difficult is False, 这个参数表示这个检测目标是否为困难
+        if gt_difficult is None:
+            gt_difficult = np.zeros(gt_bbox.shape[0], dtype=bool)
+
+        # np.unique函数去除 一维数组或者列表 中 重复 的元素，并按元素 由小到大 返回一个新的 无元素重复 的元组或者列表
+        for l in np.unique(np.concatenate((pred_label, gt_label)).astype(int)):
